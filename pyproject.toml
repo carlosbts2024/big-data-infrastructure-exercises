@@ -16,7 +16,6 @@ start = "bdi_api.app:main"
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
 requests = "^2"
-fastapi = {extras = ["standard"], version = "^0.115.6"}
 uvicorn = "^0.24.0"
 pydantic = "^2"
 pydantic-settings = "^2"
@@ -29,6 +28,9 @@ opentelemetry-api = "1.21.0"
 opentelemetry-sdk = "1.21.0"
 opentelemetry-instrumentation-fastapi = "0.42b0"
 # Add your dependencies here
+beautifulsoup4 = "^4.12.3"
+pandas = "^2.2.3"
+fastapi = "^0.115.6"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.5.0"

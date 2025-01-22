@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-
+from unittest.mock import patch
 
 class TestS1Student:
     """
@@ -16,6 +16,68 @@ class TestS1Student:
         with client as client:
             response = client.post("/api/s1/aircraft/download?file_limit=1")
             assert True
+
+    def test_download_data_internal_server_error(self, client: TestClient) -> None:
+
+        with patch("bdi_api.s1.exercise.requests.get") as mock_get:
+            mock_get.side_effect = Exception("Mocked exception for testing")
+            response = client.post("/api/s1/aircraft/download?file_limit=1")
+
+            assert response.status_code == 500
+            assert response.json() == {
+                "detail": "Failed to fetch or download files: Mocked exception for testing"
+            }
+
+    def test_download_invalid_file_limit(self, client: TestClient) -> None:
+        with client as client:
+            response = client.post("/api/s1/aircraft/download?file_limit=-1")
+            assert response.status_code == 422, "file_limit must be greater than 0"
+
+    def test_no_files_to_download(self, client: TestClient) -> None:
+        with patch("bdi_api.s1.exercise.BeautifulSoup") as mock_soup:
+            mock_soup.return_value.find_all.return_value = []
+
+            response = client.post("/api/s1/aircraft/download?file_limit=1")
+            assert response.status_code == 200
+
+    def test_list_aircraft_file_not_found(self, client: TestClient) -> None:
+        with patch("bdi_api.s1.exercise.os.path.exists") as mock_exists:
+            mock_exists.return_value = False
+            response = client.get("/api/s1/aircraft/")
+
+            assert response.status_code == 404
+            assert response.json() == {
+                "detail": "Prepared data file not found."
+            }
+
+    def test_list_aircraft_internal_server_error(self, client: TestClient) -> None:
+        with patch("bdi_api.s1.exercise.pd.read_json") as mock_read_json:
+            mock_read_json.side_effect = Exception("Mocked exception for testing")
+            response = client.get("/api/s1/aircraft/")
+
+            assert response.status_code == 500
+            assert response.json() == {
+                "detail": "Failed to list aircraft: Mocked exception for testing"
+            }
+    def test_get_aircraft_positions_internal_server_error(self, client: TestClient) -> None:
+        with patch("bdi_api.s1.exercise.pd.read_json") as mock_read_json:
+            mock_read_json.side_effect = Exception("Mocked exception for testing")
+            response = client.get("/api/s1/aircraft/000000/positions")
+
+            assert response.status_code == 500
+            assert response.json() == {
+                "detail": "Failed to retrieve aircraft positions: Mocked exception for testing"
+            }
+
+    def test_get_aircraft_statistics_file_not_found(self, client: TestClient) -> None:
+        with patch("bdi_api.s1.exercise.os.path.exists") as mock_exists:
+            mock_exists.return_value = False
+            response = client.get("/api/s1/aircraft/000000/stats")
+
+            assert response.status_code == 404
+            assert response.json() == {
+                "detail": "Prepared data file not found."
+            }
 
 
 class TestItCanBeEvaluated:

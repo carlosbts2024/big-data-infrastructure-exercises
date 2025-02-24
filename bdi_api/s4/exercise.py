@@ -33,7 +33,6 @@ def download_data(
         Query(..., description="Limits the number of files to download from the source."),
     ] = 100,
 ) -> str:
-    """Download files from external source and upload to S3."""
     base_url = settings.source_url + "/2023/11/01/"
     s3_bucket = settings.s3_bucket
     s3_prefix_path = "raw/day=20231101/"
@@ -62,11 +61,11 @@ def download_data(
 
         file_links = file_links[:file_limit]
 
-        print("🚀 Starting concurrent downloads and uploads...")
+        print("Starting concurrent downloads and uploads...")
         with ThreadPoolExecutor(max_workers=10) as executor:
             executor.map(lambda link: download_file(link, base_url, s3_bucket, s3_prefix_path), file_links)
 
-        print("✅ All downloads and uploads completed.")
+        print("All downloads and uploads completed.")
 
     except Exception as e:
         raise HTTPException(
@@ -86,18 +85,18 @@ def prepare_data() -> str:
     try:
         file_keys = list_s3_files(s3_bucket, s3_prefix_path)
         if not file_keys:
-            return "⚠️ No files found to process."
+            return "No files found to process."
 
         all_aircraft_data = process_s3_files(s3_bucket, file_keys)
 
         if all_aircraft_data:
             upload_to_s3(all_aircraft_data, s3_bucket, s3_output_prefix)
         else:
-            return "⚠️ No valid aircraft data found for preparation."
+            return "No valid aircraft data found for preparation."
 
-        return "✅ Aircraft data prepared and uploaded to S3."
+        return "Aircraft data prepared and uploaded to S3."
 
     except (NoCredentialsError, BotoCoreError) as e:
-        raise HTTPException(status_code=500, detail=f"❌ S3 Error: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"S3 Error: {str(e)}") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"❌ Processing Error: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Processing Error: {str(e)}") from e

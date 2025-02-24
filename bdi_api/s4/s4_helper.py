@@ -16,12 +16,12 @@ def delete_files_in_s3_folder(bucket_name, prefix):
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
 
     if "Contents" not in response:
-        print("✅ No files to delete in S3 folder.")
+        print("No files to delete in S3 folder.")
         return
 
     keys_to_delete = [{"Key": obj["Key"]} for obj in response["Contents"]]
     s3_client.delete_objects(Bucket=bucket_name, Delete={"Objects": keys_to_delete})
-    print(f"✅ Deleted {len(keys_to_delete)} files from s3://{bucket_name}/{prefix}")
+    print(f"Deleted {len(keys_to_delete)} files from s3://{bucket_name}/{prefix}")
 
 
 def clear_directory(directory_path):
@@ -97,7 +97,7 @@ def process_s3_files(s3_bucket: str, file_keys: list) -> list:
             all_aircraft_data.extend(process_aircraft_data(file_data, unique_aircraft_data))
             print("file process: " + file_key)
         except Exception as e:
-            print(f"❌ Error processing {file_key}: {e}")
+            print(f"Error processing {file_key}: {e}")
     return all_aircraft_data
 
 
@@ -107,7 +107,7 @@ def upload_to_s3(data: list, s3_bucket: str, s3_output_prefix: str):
 
     with io.BytesIO(json.dumps(data, indent=4).encode()) as file_buffer:
         s3_client.upload_fileobj(file_buffer, s3_bucket, output_key)
-    print(f"✅ Upload complete: s3://{s3_bucket}/{output_key}")
+    print(f"Upload complete: s3://{s3_bucket}/{output_key}")
 
 
 def download_file(link, base_url, s3_bucket, s3_prefix_path):
@@ -124,7 +124,7 @@ def download_file(link, base_url, s3_bucket, s3_prefix_path):
         with io.BytesIO(file_content) as file_buffer:
             s3_client.upload_fileobj(file_buffer, s3_bucket, s3_object_key)
 
-        print(f"📦 File: {link} | Size: {file_size} bytes | ✅ Uploaded to S3: s3://{s3_bucket}/{s3_object_key}")
+        print(f"File: {link} | Size: {file_size} bytes | Uploaded to S3: s3://{s3_bucket}/{s3_object_key}")
 
     except requests.RequestException as e:
-        print(f"❌ Download Error: {file_url} - {str(e)}")
+        print(f"Download Error: {file_url} - {str(e)}")

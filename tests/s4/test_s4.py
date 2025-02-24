@@ -30,9 +30,11 @@ class TestS4Student:
 
     def test_download_no_files(self, client: TestClient) -> None:
         with (
+            patch("bdi_api.s4.exercise.delete_files_in_s3_folder") as mock_delete_files,
             patch("bdi_api.s4.exercise.requests.get") as mock_get,
             patch("bdi_api.s4.exercise.s3_client.upload_fileobj") as mock_upload,
         ):
+            mock_delete_files.return_value = None
             mock_get.return_value.status_code = 200
             mock_get.return_value.text = ""
             mock_upload.return_value = None
@@ -106,7 +108,7 @@ class TestS4Student:
             response = client.post("/api/s4/aircraft/prepare")
 
             assert response.status_code == 200
-            assert response.json() == "⚠️ No valid aircraft data found for preparation."
+            assert response.json() == "No valid aircraft data found for preparation."
 
     def test_prepare_no_files_found(self, client: TestClient) -> None:
         with patch("bdi_api.s4.exercise.list_s3_files") as mock_list_s3_files:
@@ -115,7 +117,7 @@ class TestS4Student:
             response = client.post("/api/s4/aircraft/prepare")
 
             assert response.status_code == 200
-            assert response.json() == "⚠️ No files found to process."
+            assert response.json() == "No files found to process."
 
     def test_prepare_success(self, client: TestClient) -> None:
         with (
@@ -132,7 +134,7 @@ class TestS4Student:
             response = client.post("/api/s4/aircraft/prepare")
 
             assert response.status_code == 200
-            assert response.json() == "✅ Aircraft data prepared and uploaded to S3."
+            assert response.json() == "Aircraft data prepared and uploaded to S3."
 
     def test_prepare_no_files(self, client: TestClient) -> None:
         with patch("bdi_api.s4.exercise.list_s3_files") as mock_list_s3_files:
@@ -141,7 +143,7 @@ class TestS4Student:
             response = client.post("/api/s4/aircraft/prepare")
 
             assert response.status_code == 200
-            assert response.json() == "⚠️ No files found to process."
+            assert response.json() == "No files found to process."
 
     def test_prepare_upload_error(self, client: TestClient) -> None:
         with (
@@ -158,7 +160,7 @@ class TestS4Student:
             response = client.post("/api/s4/aircraft/prepare")
 
             assert response.status_code == 500
-            assert "❌ S3 Error" in response.json()["detail"]
+            assert "S3 Error" in response.json()["detail"]
 
     def test_process_s3_files(self, client: TestClient) -> None:
         with (
@@ -175,7 +177,7 @@ class TestS4Student:
             response = client.post("/api/s4/aircraft/prepare")
 
             assert response.status_code == 200
-            assert response.json() == "✅ Aircraft data prepared and uploaded to S3."
+            assert response.json() == "Aircraft data prepared and uploaded to S3."
 
     def test_list_s3_files(self, client: TestClient) -> None:
         with patch("bdi_api.s4.s4_helper.s3_client.list_objects_v2") as mock_list_objects:

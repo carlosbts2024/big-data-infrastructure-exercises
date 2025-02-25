@@ -7,6 +7,7 @@ from botocore.exceptions import BotoCoreError, NoCredentialsError
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, HTTPException, status
 from fastapi.params import Query
+from tqdm import tqdm
 
 from bdi_api.settings import Settings
 
@@ -61,9 +62,11 @@ def download_data(
 
         file_links = file_links[:file_limit]
 
-        print("Starting concurrent downloads and uploads...")
+        print("Starting concurrent downloads and uploads of " + str(len(file_links)) + " files." )
+
         with ThreadPoolExecutor(max_workers=10) as executor:
-            executor.map(lambda link: download_file(link, base_url, s3_bucket, s3_prefix_path), file_links)
+            list(tqdm(executor.map(lambda link: download_file(link, base_url, s3_bucket, s3_prefix_path), file_links),
+                      total=len(file_links), desc="Downloading Files"))
 
         print("All downloads and uploads completed.")
 

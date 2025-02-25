@@ -212,7 +212,7 @@ class TestS4Student:
                 {"hex": "ghi789", "r": "TWR"},
             ],
         }
-        result = process_aircraft_data(data, set())
+        result = process_aircraft_data(data)
         assert len(result) == 2
         assert result[0]["icao"] == "abc123"
         assert result[0]["max_altitude_baro"] == 10000

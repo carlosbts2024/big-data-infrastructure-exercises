@@ -11,18 +11,19 @@ PROJECT_DIR = dirname(dirname(bdi_api.__file__))
 
 class DBCredentials(BaseSettings):
     """Use env variables prefixed with BDI_DB_"""
-    host: str = os.getenv("BDI_DB_HOST", "localhost")
-    port: int = int(os.getenv("BDI_DB_PORT", 5432))
-    username: str = os.getenv("BDI_DB_USERNAME", "myuser")
-    password: str = os.getenv("BDI_DB_PASSWORD", "mypassword")
-    database: str = os.getenv("BDI_DB_NAME", "aircraft_db")  # ✅ Ensure it's loaded
 
-    # host: str
-    # port: int = 5432
-    # username: str
-    # password: str
-    # database: str
-    # model_config = SettingsConfigDict(env_prefix="bdi_db_")
+    # host: str = os.getenv("BDI_DB_HOST", "localhost")
+    # port: int = int(os.getenv("BDI_DB_PORT", 5432))
+    # username: str = os.getenv("BDI_DB_USERNAME", "myuser")
+    # password: str = os.getenv("BDI_DB_PASSWORD", "mypassword")
+    # database: str = os.getenv("BDI_DB_NAME", "aircraft_db")  # ✅ Ensure it's loaded
+
+    host: str
+    port: int = 5432
+    username: str
+    password: str
+    database: str
+    model_config = SettingsConfigDict(env_prefix="bdi_db_")
 
 
 class Settings(BaseSettings):
@@ -38,7 +39,6 @@ class Settings(BaseSettings):
         default="bdi-test",
         description="Call the api like `BDI_S3_BUCKET=yourbucket poetry run uvicorn...`",
     )
-
 
     telemetry: bool = False
     telemetry_dsn: str = "http://project2_secret_token@uptrace:14317/2"

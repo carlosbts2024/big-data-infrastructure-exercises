@@ -9,19 +9,18 @@ from tqdm import tqdm
 s3_client = boto3.client("s3")
 thread_local = threading.local()
 
+
 def get_json_from_s3(s3_bucket: str, file_key: str) -> dict:
     file_response = s3_client.get_object(Bucket=s3_bucket, Key=file_key)
     return json.load(file_response["Body"])
+
 
 def list_s3_files(s3_bucket: str, s3_prefix_path: str) -> list:
     response = s3_client.list_objects_v2(Bucket=s3_bucket, Prefix=s3_prefix_path)
     return [obj["Key"] for obj in response.get("Contents", [])]
 
+
 def process_batch_s7(batch, aircraft_timestamp):
-    """
-    Processes a batch of aircraft data, ensuring data cleaning & deduplication.
-    Returns a cleaned list of aircraft records.
-    """
     processed_batch = []
     unique_aircraft_data = set()
 
@@ -31,20 +30,17 @@ def process_batch_s7(batch, aircraft_timestamp):
         if ac.get("r") == "TWR":
             continue
 
-        # Normalize emergency status
         if ac.get("emergency") in {None, "none", "None", "null"}:
             ac["emergency"] = False
         else:
             ac["emergency"] = ac["emergency"]
 
-        # Normalize altitude (barometric altitude)
         alt_baro = ac.get("alt_baro")
         if alt_baro in {"ground", None} or (isinstance(alt_baro, (int, float)) and alt_baro < 0):
             ac["alt_baro"] = 0
         else:
             ac["alt_baro"] = alt_baro
 
-        # Normalize ground speed
         gs = ac.get("gs")
         if gs in {None, "none", "None", "null"}:
             ac["gs"] = 0.0
@@ -52,9 +48,8 @@ def process_batch_s7(batch, aircraft_timestamp):
             try:
                 ac["gs"] = float(gs)
             except ValueError:
-                ac["gs"] = 0.0  # Fallback in case of unexpected values
+                ac["gs"] = 0.0
 
-        # Create Unique Key
         unique_key = (
             str(ac.get("hex")),
             str(ac.get("r")),
@@ -62,11 +57,10 @@ def process_batch_s7(batch, aircraft_timestamp):
             round(float(ac["lat"]), 6),
             round(float(ac["lon"]), 6),
             int(ac.get("alt_baro")),
-            int(ac.get("gs")),  # Ensure integer consistency
+            int(ac.get("gs")),
             bool(ac.get("emergency")),
         )
 
-        # Deduplication within batch
         if unique_key not in unique_aircraft_data:
             unique_aircraft_data.add(unique_key)
             processed_batch.append(
@@ -80,16 +74,11 @@ def process_batch_s7(batch, aircraft_timestamp):
                     "max_ground_speed": unique_key[6],
                     "had_emergency": unique_key[7],
                     "timestamp": aircraft_timestamp,
-                }
+                },
             )
-
     return processed_batch
 
 def process_aircraft_data(data: dict, batch_size: int = 100) -> list:
-    """
-    Processes a batch of aircraft data in parallel.
-    Returns a cleaned & deduplicated list of records.
-    """
     aircraft_data = data.get("aircraft", [])
     aircraft_timestamp = data.get("now")
 
@@ -97,7 +86,7 @@ def process_aircraft_data(data: dict, batch_size: int = 100) -> list:
         return []
 
     total_records = len(aircraft_data)
-    batches = [aircraft_data[i: i + batch_size] for i in range(0, total_records, batch_size)]
+    batches = [aircraft_data[i : i + batch_size] for i in range(0, total_records, batch_size)]
 
     with ProcessPoolExecutor(max_workers=os.cpu_count() or 4) as executor:
         results = executor.map(process_batch_s7, batches, [aircraft_timestamp] * len(batches))
@@ -106,10 +95,9 @@ def process_aircraft_data(data: dict, batch_size: int = 100) -> list:
 
 
 def process_s3_files(s3_bucket: str, file_keys: list, batch_size: int = 100) -> list:
-
     all_aircraft_data = []
-    max_threads = min(len(file_keys), 10)  # Avoid excessive threads
-    seen_aircraft = set()  # Global deduplication set
+    max_threads = min(len(file_keys), 10)
+    seen_aircraft = set()
 
     def download_and_process(file_key):
         try:
@@ -146,4 +134,3 @@ def process_s3_files(s3_bucket: str, file_keys: list, batch_size: int = 100) -> 
             all_aircraft_data.extend(future.result())
 
     return all_aircraft_data
-

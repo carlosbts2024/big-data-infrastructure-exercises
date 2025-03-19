@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from functools import lru_cache
 
 import psycopg2
 import psycopg2.extras
@@ -11,19 +12,9 @@ from bdi_api.settings import DBCredentials, Settings
 from .s7_helper import list_s3_files, process_s3_files
 
 settings = Settings()
-db_credentials = DBCredentials()
 BASE_URL = "https://samples.adsbexchange.com/readsb-hist/2023/11/01/"
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-DB_CONN = psycopg2.connect(
-    host=db_credentials.host,
-    port=db_credentials.port,
-    user=db_credentials.username,
-    password=db_credentials.password,
-    dbname=db_credentials.database
-)
 
 s7 = APIRouter(
     responses={
@@ -34,8 +25,23 @@ s7 = APIRouter(
     tags=["s7"],
 )
 
+@lru_cache
+def get_db_credentials():
+    return DBCredentials()
+
+@lru_cache
+def get_db_connection():
+    db_credentials = get_db_credentials()
+    return psycopg2.connect(
+        host=db_credentials.host,
+        port=db_credentials.port,
+        user=db_credentials.username,
+        password=db_credentials.password,
+        dbname=db_credentials.database,
+    )
+
 def create_table_if_not_exists():
-    with DB_CONN.cursor() as cur:
+    with get_db_connection().cursor() as cur:
         sql = """
         CREATE TABLE IF NOT EXISTS aircraft_data (
             id SERIAL PRIMARY KEY,
@@ -51,19 +57,15 @@ def create_table_if_not_exists():
             CONSTRAINT aircraft_unique UNIQUE (icao, timestamp)
         );
         """
-        cur.execute(sql)
-        DB_CONN.commit()
+        cur.execute(sql.strip())
+        get_db_connection().commit()
 
 def insert_data_to_postgres(data: list[dict]):
-    if not data:
-        logging.info("No data available to insert.")
-        return
-
     num_records = len(data)
-    logging.info(f"Preparing to insert {num_records} valid records into PostgreSQL.")
+    print(f"Preparing to insert {num_records} valid records into PostgreSQL.")
 
     if num_records == 0:
-        logging.warning("No valid records found. Skipping database insertion.")
+        print("No valid records found. Skipping database insertion.")
         return
 
     records = [
@@ -78,11 +80,11 @@ def insert_data_to_postgres(data: list[dict]):
             record["had_emergency"],
             datetime.fromtimestamp(record["timestamp"], tz=timezone.utc)
             if record.get("timestamp")
-            else datetime.now(timezone.utc)
+            else datetime.now(timezone.utc),
         )
         for record in data
     ]
-    with DB_CONN.cursor() as cur:
+    with get_db_connection().cursor() as cur:
         insert_sql = """
         INSERT INTO aircraft_data (
             icao, registration, type, lat, lon,
@@ -101,9 +103,9 @@ def insert_data_to_postgres(data: list[dict]):
             timestamp = EXCLUDED.timestamp;
         """
         psycopg2.extras.execute_values(cur, insert_sql, records)
-        DB_CONN.commit()
+        get_db_connection().commit()
 
-    logging.info(f"Successfully inserted {num_records} records into PostgreSQL.")
+    print(f"Successfully inserted {num_records} records into PostgreSQL.")
 
 
 def refine_data() -> list:
@@ -123,11 +125,17 @@ def refine_data() -> list:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing Error: {str(e)}") from e
 
+
 @s7.post("/aircraft/prepare")
 def prepare_data() -> str:
     try:
+        aircraft_data = refine_data()
+        if not aircraft_data:
+            return_str = "No valid records found. Skipping database insertion."
+            logging.info(return_str)
+            return return_str
+
         create_table_if_not_exists()
-        aircraft_data = refine_data()  # Fetch from S3
         insert_data_to_postgres(aircraft_data)
         return "Aircraft data successfully inserted into PostgreSQL."
 
@@ -135,10 +143,11 @@ def prepare_data() -> str:
         logging.error(f"Processing Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Processing Error: {str(e)}") from e
 
+
 @s7.get("/aircraft/")
 def list_aircraft(num_results: int = 100, page: int = 0) -> list[dict[str, str]]:
     try:
-        with DB_CONN.cursor() as cur:
+        with get_db_connection().cursor() as cur:
             offset = page * num_results
 
             query = """
@@ -162,14 +171,9 @@ def list_aircraft(num_results: int = 100, page: int = 0) -> list[dict[str, str]]
 
 @s7.get("/aircraft/{icao}/positions")
 def get_aircraft_position(icao: str, num_results: int = 1000, page: int = 0) -> list[dict]:
-    """Returns all the known positions of an aircraft ordered by time (asc)
-    If an aircraft is not found, return an empty list. FROM THE DATABASE
-
-    Use credentials passed from `db_credentials`
-    """
     try:
-        with DB_CONN.cursor() as cur:
-            offset = page * num_results  # Pagination logic
+        with get_db_connection().cursor() as cur:
+            offset = page * num_results
 
             query = """
             SELECT timestamp, lat, lon
@@ -193,19 +197,8 @@ def get_aircraft_position(icao: str, num_results: int = 1000, page: int = 0) -> 
 
 @s7.get("/aircraft/{icao}/stats")
 def get_aircraft_statistics(icao: str) -> list[dict[str, int]]:
-    """Returns all recorded statistics about the aircraft.
-
-    Fields returned:
-    * max_altitude_baro
-    * max_ground_speed
-    * had_emergency
-
-    FROM THE DATABASE
-
-    Uses credentials passed from `db_credentials`
-    """
     try:
-        with DB_CONN.cursor() as cur:
+        with get_db_connection().cursor() as cur:
             query = """
             SELECT max_altitude_baro, max_ground_speed, had_emergency
             FROM aircraft_data
@@ -219,11 +212,7 @@ def get_aircraft_statistics(icao: str) -> list[dict[str, int]]:
             return []
 
         return [
-            {
-                "max_altitude_baro": str(row[0]),
-                "max_ground_speed": str(row[1]),
-                "had_emergency": bool(row[2])
-            }
+            {"max_altitude_baro": str(row[0]), "max_ground_speed": str(row[1]), "had_emergency": bool(row[2])}
             for row in rows
         ]
 
@@ -231,4 +220,4 @@ def get_aircraft_statistics(icao: str) -> list[dict[str, int]]:
         logging.error(f"Database error while retrieving stats for {icao}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error retrieving aircraft statistics from the database") from e
 
-    #return {"max_altitude_baro": 300000, "max_ground_speed": 493, "had_emergency": False}
+

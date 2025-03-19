@@ -1,4 +1,3 @@
-import os
 from os.path import dirname, join
 
 from pydantic import Field
@@ -16,7 +15,7 @@ class DBCredentials(BaseSettings):
     # port: int = int(os.getenv("BDI_DB_PORT", 5432))
     # username: str = os.getenv("BDI_DB_USERNAME", "myuser")
     # password: str = os.getenv("BDI_DB_PASSWORD", "mypassword")
-    # database: str = os.getenv("BDI_DB_NAME", "aircraft_db")  # ✅ Ensure it's loaded
+    # database: str = os.getenv("BDI_DB_NAME", "aircraft_db")
 
     host: str
     port: int = 5432

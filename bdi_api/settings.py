@@ -1,4 +1,5 @@
 from os.path import dirname, join
+from typing import ClassVar
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,21 +10,22 @@ PROJECT_DIR = dirname(dirname(bdi_api.__file__))
 
 
 class DBCredentials(BaseSettings):
-    """Use env variables prefixed with BDI_DB_"""
-
-    # host: str = os.getenv("BDI_DB_HOST", "localhost")
-    # port: int = int(os.getenv("BDI_DB_PORT", 5432))
-    # username: str = os.getenv("BDI_DB_USERNAME", "myuser")
-    # password: str = os.getenv("BDI_DB_PASSWORD", "mypassword")
-    # database: str = os.getenv("BDI_DB_NAME", "aircraft_db")
-
+    """Database credentials loaded from environment variables prefixed with BDI_DB_"""
     host: str
     port: int = 5432
     username: str
     password: str
     database: str
-    model_config = SettingsConfigDict(env_prefix="bdi_db_")
 
+    POSTGRES_DSN: ClassVar[str]
+
+    model_config = SettingsConfigDict(env_prefix="BDI_DB_")
+
+    def __init__(self, **values):
+        super().__init__(**values)
+        self.__class__.POSTGRES_DSN = (
+            f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+        )
 
 class Settings(BaseSettings):
     source_url: str = Field(

@@ -1,0 +1,12 @@
+project:
+  name: big-data-infrastructure-exercises
+
+deploy:
+  docker:
+    mounts:
+      - source: ./airflowdags
+        target: /usr/local/airflow/airflowdags
+      - source: ./dags
+        target: /usr/local/airflow/dags
+      - source: ./bdi_api
+        target: /usr/local/airflow/bdi_api

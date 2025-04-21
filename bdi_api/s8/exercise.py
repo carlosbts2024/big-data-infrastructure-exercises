@@ -4,11 +4,10 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from bdi_api.settings import DBCredentials, Settings
+from bdi_api.settings import Settings
 from dags.s8_helper import get_db_conn, put_db_conn
 
 settings = Settings()
-db_credentials = DBCredentials()
 BASE_URL = "https://samples.adsbexchange.com/readsb-hist/2023/11/01/"
 
 s8 = APIRouter(
@@ -20,6 +19,7 @@ s8 = APIRouter(
     tags=["s8"],
 )
 
+
 class AircraftReturn(BaseModel):
     # DO NOT MODIFY IT
     icao: str
@@ -28,7 +28,6 @@ class AircraftReturn(BaseModel):
     owner: Optional[str]
     manufacturer: Optional[str]
     model: Optional[str]
-
 
 @s8.get("/aircraft/", response_model=list[AircraftReturn])
 def list_aircraft(num_results: int = 100, page: int = 0) -> list[AircraftReturn]:
@@ -87,12 +86,15 @@ def get_aircraft_co2(icao: str, day: str) -> AircraftCO2:
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COUNT(*)
                 FROM aircraft_data
                 WHERE icao = %s
                   AND DATE(timestamp) = %s
-            """, (icao, day_to_compute))
+            """,
+                (icao, day_to_compute),
+            )
             result = cur.fetchone()
 
             if not result or result[0] == 0:
@@ -101,23 +103,29 @@ def get_aircraft_co2(icao: str, day: str) -> AircraftCO2:
 
             record_count = result[0]
             hours_flown = record_count * 5 / 3600
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT type
                 FROM aircraft_data
                 WHERE icao = %s
                 ORDER BY timestamp DESC
                 LIMIT 1
-            """, (icao,))
+            """,
+                (icao,),
+            )
             type_result = cur.fetchone()
             aircraft_type = type_result[0] if type_result else None
 
             galph = None
             if aircraft_type:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT galph
                     FROM aircraft_type_data
                     WHERE icao_code = %s
-                """, (aircraft_type,))
+                """,
+                    (aircraft_type,),
+                )
                 fuel_result = cur.fetchone()
                 galph = fuel_result[0] if fuel_result else None
 
@@ -134,4 +142,3 @@ def get_aircraft_co2(icao: str, day: str) -> AircraftCO2:
         raise HTTPException(status_code=500, detail="Internal server error") from e
     finally:
         put_db_conn(conn)
-
